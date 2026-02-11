@@ -6,6 +6,7 @@ import '../../../../core/color/app_color.dart';
 import '../../../../core/utils/utils.dart';
 import '../../../delivery/presentation/manager/delivery_cubit.dart';
 import '../../../delivery/presentation/manager/delivery_state.dart';
+import '../../../delivery/presentation/view/delivery_map_screen.dart';
 import '../../../main/presentation/widgets/custom_button.dart';
 import '../../data/models/order_model.dart';
 
@@ -153,6 +154,25 @@ class OrderDetailsScreen extends StatelessWidget {
         title: "Start Pickup",
         onPressed: () {
           context.read<DeliveryCubit>().markAsPickedUp();
+        },
+      );
+    }
+    if (state.status == DeliveryStatus.pickingUp) {
+      return CustomButton(
+        title: "On The Way",
+        onPressed: () {
+          final cubit= context.read<DeliveryCubit>();
+          cubit.markAsPickedUp();
+          Navigator.push(
+          context,
+          MaterialPageRoute(
+          builder: (_) => BlocProvider.value(
+          value: cubit, // نمرر نفس الـ Cubit
+          child: DeliveryMapScreen(),
+          ),
+          ),
+          );
+        //  context.read<DeliveryCubit>().markAsOnTheWay();
         },
       );
     }

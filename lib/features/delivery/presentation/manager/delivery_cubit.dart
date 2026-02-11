@@ -4,14 +4,20 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:untitled18/core/service/location_search_service.dart';
 
+import '../../../../core/service/navigation_search.dart';
+import '../../../../core/service/route_service.dart';
+import '../../../main/presentation/manager/location_cubit.dart';
 import '../../../order/data/models/order_model.dart';
 import 'delivery_state.dart';
+import 'package:untitled18/features/delivery/presentation/manager/delivery_cubit.dart';
 
 class DeliveryCubit extends Cubit<DeliveryState> {
   DeliveryCubit() : super(const DeliveryInitial());
 
   Timer? _animationTimer;
+  final TextEditingController searchController = TextEditingController();
 
 
   void initializeOrder({
@@ -20,20 +26,21 @@ class DeliveryCubit extends Cubit<DeliveryState> {
   }) {
     final order = OrderModel(
       id: "ORD123",
-      customerName: "John Doe",
-      customerPhone: "+1234567890",
+      customerName: "Mohammad",
+      customerPhone: "+963xxxxxxxxx",
       item: "Tender Coconut",
       quantity: 4,
       price: 320,
       pickUpLocation: shopLocation,
       deliveryLocation: userLocation,
-      pickUpAddress: "Kathmandu Durbar Square",
-      deliveryAddress: "Patan Durbar Square",
+      pickUpAddress: "Tartous ",
+      deliveryAddress: "Safita",
     );
 
     emit(
       DeliveryInProgress(
         isOnline: true,
+        userLocation: userLocation,
         status: DeliveryStatus.waitingForAcceptance,
         currentOrder: order,
         routePoints: const [],
@@ -50,7 +57,7 @@ class DeliveryCubit extends Cubit<DeliveryState> {
 
     final current = state as DeliveryInProgress;
 
-    emit(current.copyWith(status: DeliveryStatus.pickingUp));
+    emit(current.copyWith(status: DeliveryStatus.orderAccepted));
 
     Future.delayed(const Duration(seconds: 2), () {
       _generateRoute();
@@ -69,7 +76,9 @@ class DeliveryCubit extends Cubit<DeliveryState> {
 
     final current = state as DeliveryInProgress;
 
-    emit(current.copyWith(status: DeliveryStatus.enRoute));
+    emit(current.copyWith(status: DeliveryStatus.pickingUp));
+    _generateRoute();
+    _setupMap();
     _startDeliverySimulation();
   }
 //function to mark destination reached
@@ -78,36 +87,121 @@ class DeliveryCubit extends Cubit<DeliveryState> {
     emit(const DeliveryCompleted());
   }
 
-  List<LatLng> _buildDynamicRoute(LatLng start, LatLng end) {
-    const steps = 40;
-    final random = Random();
-    final List<LatLng> route = [];
 
-    for (int i = 0; i <= steps; i++) {
-      final t = i / steps;
-      route.add(
-        LatLng(
-          start.latitude +
-              (end.latitude - start.latitude) * t +
-              (random.nextDouble() - 0.5) * 0.0002,
-          start.longitude +
-              (end.longitude - start.longitude) * t +
-              (random.nextDouble() - 0.5) * 0.0002,
-        ),
-      );
-    }
-    return route;
-  }
-//function to generate route between pickup and delivery location
-  void _generateRoute() {
+  Future<void> generateRealisticRoute() async {
     if (state is! DeliveryInProgress) return;
 
     final current = state as DeliveryInProgress;
 
-    final route = _buildDynamicRoute(
+    final routePoints = await RouteService.getRouteOSRM(
       current.currentOrder.pickUpLocation,
       current.currentOrder.deliveryLocation,
     );
+
+    emit(current.copyWith(
+      routePoints: routePoints,
+      deliveryBoyPosition: routePoints.isNotEmpty ? routePoints.first : null,
+    ));
+  }
+  Future<void> generateRouteFromSearch({required String startQuery, required String destinationQuery}) async{
+final startLatLng = await searchLocation(startQuery);
+final destinationLatLng = await searchLocation(destinationQuery);
+if (startLatLng == null || destinationLatLng == null) return;
+final routePoints =
+await RouteService.getRouteWithInfo(
+startLatLng,
+destinationLatLng,
+);
+if (routePoints == null) return;
+final distanceKm = routePoints.distanceMeters / 1000;
+final estimatedPrice = 5 + (distanceKm * 2);
+
+emit(DeliveryInProgress(
+    status: DeliveryStatus.waitingForAcceptance,
+    currentOrder: OrderModel(
+      id: "SEARCH",
+      customerName: "",
+      customerPhone: "",
+      item: "",
+      quantity: 0,
+      price: 0,
+      pickUpLocation: startLatLng,
+      deliveryLocation: destinationLatLng,
+      pickUpAddress: startQuery,
+      deliveryAddress: destinationQuery,
+    ),
+    routePoints: routePoints.points,
+    deliveryBoyPosition: routePoints.points.first,
+    distanceMeters: routePoints.distanceMeters,
+    durationSeconds: routePoints.durationSeconds,
+    estimatedPrice: estimatedPrice,
+    polylines: const{},
+    markers: const{})
+);
+_setupSearchMap();
+  }
+
+  Future<void> searchAndGenerateRoute(
+      LatLng userLocation,
+      String destination,
+      ) async {
+
+    final routePoints =
+    await generateRouteToLocation(userLocation, destination);
+
+    if (routePoints.isEmpty) return;
+
+
+    if (state is DeliveryInProgress) {
+      final current = state as DeliveryInProgress;
+
+      emit(
+        current.copyWith(
+          routePoints: routePoints,
+          deliveryBoyPosition: routePoints.first,
+        ),
+      );
+    }
+
+    else {
+      emit(
+        DeliveryInProgress(
+          userLocation: userLocation,
+          status: DeliveryStatus.waitingForAcceptance,
+          currentOrder: OrderModel(
+            id: "SEARCH",
+            customerName: "",
+            customerPhone: "",
+            item: "",
+            quantity: 0,
+            price: 0,
+            pickUpLocation: userLocation,
+            deliveryLocation: routePoints.last,
+            pickUpAddress: "Current Location",
+            deliveryAddress: destination,
+          ),
+          routePoints: routePoints,
+          deliveryBoyPosition: routePoints.first,
+          polylines: const {},
+          markers: const {},
+          isOnline: true,
+        ),
+      );
+    }
+
+    _setupSearchMap();
+  }
+//function to generate route between pickup and delivery location
+  void _generateRoute() async {
+    if (state is! DeliveryInProgress) return;
+
+    final current = state as DeliveryInProgress;
+
+    final route = await RouteService.getRouteOSRM(
+      current.currentOrder.pickUpLocation,
+      current.currentOrder.deliveryLocation,
+    );
+    if (route.isEmpty) return;
 
     emit(
       current.copyWith(
@@ -115,6 +209,48 @@ class DeliveryCubit extends Cubit<DeliveryState> {
         deliveryBoyPosition: route.first,
       ),
     );
+  }
+  void _setupSearchMap() {
+    if (state is! DeliveryInProgress) return;
+
+    final current = state as DeliveryInProgress;
+
+    if (current.routePoints.isEmpty) return;
+
+    final polylines = {
+      Polyline(
+        polylineId: const PolylineId("route"),
+        points: current.routePoints,
+        width: 5,
+        color: Colors.blue,
+      ),
+    };
+
+    final markers = {
+      Marker(
+        markerId: const MarkerId("start"),
+        position: current.routePoints.first,
+        icon: BitmapDescriptor.defaultMarkerWithHue(
+          BitmapDescriptor.hueGreen,
+        ),
+      ),
+      Marker(
+        markerId: const MarkerId("destination"),
+        position: current.routePoints.last,
+        icon: BitmapDescriptor.defaultMarkerWithHue(
+          BitmapDescriptor.hueRed,
+        ),
+      ),
+    };
+
+    emit(
+      current.copyWith(
+        polylines: polylines,
+        markers: markers,
+      ),
+    );
+
+    _updateDeliveryBoyMarker();
   }
 //function to setup map polylines and markers
   void _setupMap() {

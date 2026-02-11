@@ -27,13 +27,13 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<IconData> _icons = [
     FontAwesomeIcons.house,
-    FontAwesomeIcons.boxOpen,
+    FontAwesomeIcons.searchengin,
     FontAwesomeIcons.solidCircleUser,
   ];
 
   final List<String> _labels = [
     "Home",
-    "Orders",
+    "Search",
     "Profile",
   ];
 

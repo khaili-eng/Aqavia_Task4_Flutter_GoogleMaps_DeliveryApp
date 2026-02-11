@@ -34,7 +34,15 @@ class DriverHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    context.watch<DeliveryCubit>().state;
+    final deliveryCubit = context.read<DeliveryCubit>();
+    Future.microtask(() {
+      if (deliveryCubit.state is DeliveryInitial) {
+        deliveryCubit.initializeOrder(
+          userLocation: const LatLng(34.82099, 36.11773), // موقع المستخدم
+          shopLocation: const LatLng(34.8820, 35.9000), // موقع المتجر
+        );
+      }
+    });
 
     return Scaffold(
       backgroundColor: AppColor.backgroundColor,
@@ -67,24 +75,33 @@ class DriverHome extends StatelessWidget {
 
           return Stack(
             children: [
-              GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: state.currentLocation,
-                  zoom: 15,
-                ),
-                myLocationEnabled: true,
-                myLocationButtonEnabled: true,
-                markers: _buildMarker(state.currentLocation),
+              BlocBuilder<DeliveryCubit, DeliveryState>(
+                builder: (context, deliveryState) {
+                  return GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: state.currentLocation, // من LocationCubit
+                      zoom: 15,
+                    ),
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: false,
+                    markers: deliveryState is DeliveryInProgress &&
+                        deliveryState.markers.isNotEmpty
+                        ? deliveryState.markers
+                        : _buildMarker(state.currentLocation),
 
+                    polylines: deliveryState is DeliveryInProgress
+                        ? deliveryState.polylines
+                        : {},
+                  );
+                },
+              ),
+              Positioned(
+                top: 80,
+                left: 16,
+                right: 16,
+                child: _buildSearchBar(context),
               ),
 
-       /*  ElevatedButton(onPressed: (){
-           context.read<DeliveryCubit>().setShopLocation(
-             const LatLng(33.5138, 36.2765),
-           );
-
-         },
-             child: const Text("Select Delivery Location")),*/
 
 
               BlocBuilder<DeliveryCubit, DeliveryState>(
@@ -107,85 +124,48 @@ class DriverHome extends StatelessWidget {
               ),
 
               /// 🟢 Online Button
-              /*Align(
-                alignment: Alignment.topCenter,
-                child: Container(
-                  height: size.height * 0.12,
-                  color: Colors.white,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Container(
-                        width: 200,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(
-                            color: AppColor.buttonMainColor,
-                            width: 2,
-                          ),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(2),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                flex: 2,
-                                child: Container(
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color:
-                                    AppColor.buttonMainColor,
-                                    borderRadius:
-                                    BorderRadius.circular(30),
-                                  ),
-                                  child: const Text(
-                                    "Online",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight:
-                                      FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
+
+              Positioned(
+                top: 30,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: BlocBuilder<DeliveryCubit, DeliveryState>(
+                    builder: (context, state) {
+                      final isOnline = state.isOnline;
+
+                      return GestureDetector(
+                        onTap: () {
+                          context.read<DeliveryCubit>().toggleOnline();
+                        },
+                        child: Container(
+                          width: 200,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: isOnline ? Colors.green : Colors.grey,
+                            borderRadius: BorderRadius.circular(30),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 6,
+                                offset: Offset(0, 3),
                               ),
-                              const Expanded(child: SizedBox()),
                             ],
                           ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            isOnline ? "Online" : "Offline",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
-              ),*/
-              BlocBuilder<DeliveryCubit, DeliveryState>(
-                builder: (context, state) {
-                  final isOnline = state.isOnline;
-
-                  return GestureDetector(
-                    onTap: () {
-                      context.read<DeliveryCubit>().toggleOnline();
-                    },
-                    child: Container(
-                      width: 200,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: isOnline ? Colors.green : Colors.grey,
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        isOnline ? "Online" : "Offline",
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  );
-                },
               ),
             ],
           );
@@ -193,4 +173,46 @@ class DriverHome extends StatelessWidget {
       ),
     );
   }
+}
+Widget _buildSearchBar(BuildContext context) {
+  final deliveryCubit = context.read<DeliveryCubit>();
+  final locationCubit = context.read<LocationCubit>();
+
+  return Material(
+    elevation: 6,
+    borderRadius: BorderRadius.circular(12),
+    child: TextField(
+      controller: deliveryCubit.searchController,
+      textInputAction: TextInputAction.search,
+      onSubmitted: (value) {
+        final destination = value.trim();
+        if (destination.isNotEmpty) {
+          deliveryCubit.searchAndGenerateRoute(
+            locationCubit.state.currentLocation,
+            destination,
+          );
+        }
+      },
+      decoration: InputDecoration(
+        hintText: "Enter your destination",
+        prefixIcon: const Icon(Icons.location_on_outlined),
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.search),
+          onPressed: () {
+            final destination =
+            deliveryCubit.searchController.text.trim();
+            if (destination.isNotEmpty) {
+              deliveryCubit.searchAndGenerateRoute(
+                locationCubit.state.currentLocation,
+                destination,
+              );
+            }
+          },
+        ),
+        border: InputBorder.none,
+        contentPadding:
+        const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    ),
+  );
 }

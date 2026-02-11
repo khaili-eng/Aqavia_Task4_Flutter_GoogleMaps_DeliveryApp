@@ -69,7 +69,7 @@ class AppRouter {
             path: RoutesName.order,
             name: 'orders',
             pageBuilder: (context, state) =>
-            const NoTransitionPage(child: OrderPage()),
+             NoTransitionPage(child: OrderPage()),
           ),
 
 

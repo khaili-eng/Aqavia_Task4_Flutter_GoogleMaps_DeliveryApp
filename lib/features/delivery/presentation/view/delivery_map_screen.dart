@@ -19,9 +19,8 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
   GoogleMapController? _mapController;
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => DeliveryCubit(),
-      child: Scaffold(
+    return
+       Scaffold(
         backgroundColor: AppColor.backgroundColor,
         body: BlocBuilder<DeliveryCubit, DeliveryState>(
           builder: (context, state) {
@@ -39,7 +38,7 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
             );
           },
         ),
-      ),
+
     );
   }
 
@@ -122,7 +121,7 @@ class _DeliveryMapScreenState extends State<DeliveryMapScreen> {
     if (state is! DeliveryInProgress) return {};
 
     if (state.routePoints.isEmpty ||
-        state.status == DeliveryStatus.waitingForAcceptance ||
+
         state.status == DeliveryStatus.rejected) {
       return {};
     }

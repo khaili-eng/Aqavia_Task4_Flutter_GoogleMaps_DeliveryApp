@@ -17,6 +17,7 @@ void main() async{
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
   await Hive.initFlutter();
+  await Hive.openBox<UserModel>('users');
   Hive.registerAdapter(UserModelAdapter());
 }
 class MyApp extends StatelessWidget {
@@ -31,6 +32,7 @@ class MyApp extends StatelessWidget {
              BlocProvider(create: (_)=>LocationCubit()),
              BlocProvider(create: (_)=>NavigationCubit()),
              BlocProvider(create: (_) => DeliveryCubit(),),
+
 
            ],
       child: MaterialApp.router(

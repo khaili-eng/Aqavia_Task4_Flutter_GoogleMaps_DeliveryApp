@@ -76,8 +76,7 @@ class OrderCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(8),
-                          image: DecorationImage(
-                              image: NetworkImage(""))
+
                         ),
                       ),
                       SizedBox(width: 12,),
@@ -129,8 +128,7 @@ class OrderCard extends StatelessWidget {
                       onPressed: (){
                     final order = context.read<DeliveryCubit>().state.currentOrder;
                     if(order == null) return;
-                    context.pushNamed("order_details",pathParameters: {"id": order.id});
-
+                    context.pushNamed("orderDetails",queryParameters: {"orderId": order.id});
 
                       }),)
               ],

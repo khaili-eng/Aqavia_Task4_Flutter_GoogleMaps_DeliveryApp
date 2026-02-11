@@ -25,10 +25,12 @@ abstract class DeliveryState extends Equatable {
 }
 
 class DeliveryInitial extends DeliveryState {
+
   const DeliveryInitial(): super(isOnline: false, status: DeliveryStatus.waitingForAcceptance);
 }
 
 class DeliveryInProgress extends DeliveryState {
+  final LatLng? userLocation;
   final DeliveryStatus status;
   final OrderModel currentOrder;
 
@@ -37,8 +39,11 @@ class DeliveryInProgress extends DeliveryState {
 
   final Set<Polyline> polylines;
   final Set<Marker> markers;
-
+  final double? distanceMeters;
+  final double? durationSeconds;
+  final double? estimatedPrice;
   const DeliveryInProgress({
+    this.userLocation,
     required this.status,
     required this.currentOrder,
     required this.routePoints,
@@ -46,18 +51,26 @@ class DeliveryInProgress extends DeliveryState {
     required this.polylines,
     required this.markers,
     bool isOnline =false,
+    this.distanceMeters,
+    this.durationSeconds,
+    this.estimatedPrice,
   }) : super(isOnline: isOnline, status: status);
 
 
   DeliveryInProgress copyWith({
+    LatLng? userLocation,
     DeliveryStatus? status,
     List<LatLng>? routePoints,
     LatLng? deliveryBoyPosition,
     Set<Polyline>? polylines,
     Set<Marker>? markers,
     bool? isOnline,
+    double? distanceMeters,
+    double? durationSeconds,
+    double? estimatedPrice,
   }) {
     return DeliveryInProgress(
+      userLocation: userLocation??this.userLocation,
       status: status ?? this.status,
       currentOrder: currentOrder,
       routePoints: routePoints ?? this.routePoints,
@@ -66,6 +79,9 @@ class DeliveryInProgress extends DeliveryState {
       polylines: polylines ?? this.polylines,
       markers: markers ?? this.markers,
       isOnline: isOnline ?? this.isOnline,
+      distanceMeters: distanceMeters ?? this.distanceMeters,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      estimatedPrice: estimatedPrice ?? this.estimatedPrice,
     );
   }
 
